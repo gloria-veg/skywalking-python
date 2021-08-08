@@ -150,3 +150,4 @@ class GrpcProtocol(Protocol):
                     queue.put(segment, block=False)
                 except Full:
                     pass
+

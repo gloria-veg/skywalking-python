@@ -27,6 +27,7 @@ from skywalking.protocol.profile.Profile_pb2_grpc import ProfileTaskStub
 from skywalking.protocol.profile.Profile_pb2 import ProfileTaskCommandQuery
 from skywalking.protocol.management.Management_pb2 import InstancePingPkg, InstanceProperties
 from skywalking.protocol.management.Management_pb2_grpc import ManagementServiceStub
+from skywalking.protocol.language_agent.Meter_pb2_grpc import MeterReportServiceStub
 
 from skywalking.command import command_service
 from skywalking.profile import profile_task_execution_service
@@ -68,7 +69,6 @@ class GrpcProfileTaskChannelService(ProfileTaskChannelService):
         self.task_stub = ProfileTaskStub(channel)
 
     def do_query(self):
-
         query = ProfileTaskCommandQuery(
             service=config.service_name,
             serviceInstance=config.service_instance,
@@ -77,3 +77,5 @@ class GrpcProfileTaskChannelService(ProfileTaskChannelService):
 
         commands = self.task_stub.getProfileTaskCommands(query)
         command_service.receive_command(commands)
+
+
