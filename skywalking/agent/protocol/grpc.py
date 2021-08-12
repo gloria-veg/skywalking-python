@@ -23,12 +23,12 @@ from time import time
 import grpc
 from skywalking.protocol.common.Common_pb2 import KeyStringValuePair
 from skywalking.protocol.language_agent.Tracing_pb2 import SegmentObject, SpanObject, Log, SegmentReference
-
+from skywalking.protocol.language_agent.Meter_pb2 import MeterData, MeterHistogram, Label, MeterSingleValue
 from skywalking import config
 from skywalking.agent import Protocol
 from skywalking.agent.protocol.interceptors import header_adder_interceptor
 from skywalking.client.grpc import GrpcServiceManagementClient, GrpcTraceSegmentReportService, \
-    GrpcProfileTaskChannelService
+    GrpcProfileTaskChannelService, GrpcMeterReportService
 from skywalking.loggings import logger
 from skywalking.trace.segment import Segment
 
@@ -43,7 +43,7 @@ class GrpcProtocol(Protocol):
                                                          1000 * config.GRPC_TIMEOUT),))
         else:
             self.channel = grpc.insecure_channel(config.collector_address, options=(('grpc.max_connection_age_grace_ms',
-                                                 1000 * config.GRPC_TIMEOUT),))
+                                                                                     1000 * config.GRPC_TIMEOUT),))
 
         if config.authentication:
             self.channel = grpc.intercept_channel(
@@ -54,6 +54,7 @@ class GrpcProtocol(Protocol):
         self.service_management = GrpcServiceManagementClient(self.channel)
         self.traces_reporter = GrpcTraceSegmentReportService(self.channel)
         self.profile_query = GrpcProfileTaskChannelService(self.channel)
+        self.meter_reporter = GrpcMeterReportService(self.channel)
 
     def _cb(self, state):
         logger.debug('grpc channel connectivity changed, [%s -> %s]', self.state, state)
@@ -85,8 +86,9 @@ class GrpcProtocol(Protocol):
     def report(self, queue: Queue, block: bool = True):
         start = time()
         segment = None
+        meter = None
 
-        def generator():
+        def generator_segment():
             nonlocal segment
 
             while True:
@@ -139,8 +141,44 @@ class GrpcProtocol(Protocol):
 
                 queue.task_done()
 
+        def generator_meter():
+            nonlocal meter
+            while True:
+                try:
+                    timeout = max(0, config.QUEUE_TIMEOUT - int(time() - start))  # type: int
+                    meter = queue.get(block=block, timeout=timeout)  # type: Meter
+                except Empty:
+                    return
+
+                logger.debug('reporting meter %s', meter)
+
+                m = MeterData(singleValue=MeterSingleValue(
+                    name='singleValueName',
+                    labels=[Label(
+                        name='LabelName1', value='LabelValue1'),
+                        Label(
+                            name='LabelName2', value='LabelValue2')],
+                    value=0
+                ),
+                    histogram=MeterHistogram(
+                        name='MeterHistogramName',
+                        labels=[Label(
+                            name='LabelName1', value='LabelValue1'),
+                            Label(
+                                name='LabelName2', value='LabelValue2')],
+                        values=[]
+                    ),
+                    service='provider',
+                    serviceInstance='668d4b1ef83111ebbc3b8c85909c8b08',
+                    timestamp=0)
+
+                yield m
+
+                queue.task_done()
+
         try:
-            self.traces_reporter.report(generator())
+            self.traces_reporter.report(generator_segment())
+            self.meter_reporter.report(generator_meter())
 
         except grpc.RpcError:
             self.on_error()
@@ -151,3 +189,8 @@ class GrpcProtocol(Protocol):
                 except Full:
                     pass
 
+            if meter:
+                try:
+                    queue.put(meter, block=False)
+                except Full:
+                    pass

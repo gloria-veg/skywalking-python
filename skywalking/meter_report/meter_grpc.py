@@ -2,7 +2,7 @@ import grpc
 import random
 from skywalking import config
 from skywalking.protocol.language_agent import Meter_pb2
-from skywalking.client import MeterReportServiceClient
+from skywalking.client import MeterReportService
 from skywalking.protocol.language_agent.Meter_pb2 import MeterData
 from skywalking.protocol.language_agent.Meter_pb2_grpc import MeterReportServiceStub
 

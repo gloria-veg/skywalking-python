@@ -29,7 +29,7 @@ class TraceSegmentReportService(object):
         raise NotImplementedError()
 
 
-class MeterReportServiceClient(object):
+class MeterReportService(object):
     def report(self, generator):
         raise NotImplementedError()
 

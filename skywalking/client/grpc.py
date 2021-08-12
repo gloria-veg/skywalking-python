@@ -20,7 +20,8 @@ from skywalking.loggings import logger
 import grpc
 
 from skywalking import config
-from skywalking.client import ServiceManagementClient, TraceSegmentReportService, ProfileTaskChannelService
+from skywalking.client import ServiceManagementClient, TraceSegmentReportService, ProfileTaskChannelService, \
+    MeterReportService
 from skywalking.protocol.common.Common_pb2 import KeyStringValuePair
 from skywalking.protocol.language_agent.Tracing_pb2_grpc import TraceSegmentReportServiceStub
 from skywalking.protocol.profile.Profile_pb2_grpc import ProfileTaskStub
@@ -79,3 +80,9 @@ class GrpcProfileTaskChannelService(ProfileTaskChannelService):
         command_service.receive_command(commands)
 
 
+class GrpcMeterReportService(MeterReportService):
+    def __init__(self, channel: grpc.Channel):
+        self.report_stub = MeterReportServiceStub(channel)
+
+    def report(self, generator):
+        self.report_stub.collect(generator, timeout=config.GRPC_TIMEOUT)
