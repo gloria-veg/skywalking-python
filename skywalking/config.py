@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 # than GRPC_TIMEOUT.
 GRPC_TIMEOUT = 300  # type: int
 QUEUE_TIMEOUT = 240  # type: int
+QUEUE_TIMEOUT = 240  # type: int
 
 RE_IGNORE_PATH = re.compile('^$')  # type: re.Pattern
 
