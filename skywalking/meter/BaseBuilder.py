@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import BaseMeter
 from skywalking.meter.MeterId import MeterId
-from skywalking.meter.MeterId import Tag
 
 
 class BaseBuilder(ABC):
@@ -36,10 +35,10 @@ class BaseBuilder(ABC):
     """ append new tags to this meter"""
 
     def get_tag(self, name, value):
-        MeterId.tags().add(Tag(name, value))
-        return #这里这个(builder)this 怎么return
+        MeterId.tags().add(MeterId.Tag(name, value))
+        return self
 
     def build(self):
-        self._meter_id.tags() #还要sort一下？
+        self._meter_id.tags().sort(MeterId.Tag)
         """create or get the meter"""
         return BaseBuilder.create()

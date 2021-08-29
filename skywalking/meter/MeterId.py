@@ -8,33 +8,6 @@ class MeterType(Enum):
     HISTOGRAM = 3
 
 
-@functools.total_ordering
-class Tag(object):
-    def __init__(self, name: str = '', value: str = ''):
-        self.__name = name
-        self.__value = value  # type: str
-
-    @property
-    def name(self):
-        return self.__name
-
-    @property
-    def value(self):
-        return self.__value
-
-    def __hash__(self):
-        """Overrides the default implementation"""
-        return hash(tuple(sorted(self.__dict__.items())))
-
-    def __lt__(self, other):
-        if self.name == other.name:
-            return self.value < other.value
-        return self.name < other.value
-
-    def __eq__(self, other):
-        return self.name == other.name and self.value == other.value
-
-
 class MeterId(object):
     _tags = []
     _name = ''
@@ -62,7 +35,7 @@ class MeterId(object):
         return self._tags
 
     def copy_to(self, name, chosen_type):
-        return MeterId(name, chosen_type, self.tags)  #tags能这样写吗
+        return MeterId(name, chosen_type, self.tags)
 
     def __eq__(self, other):
         """Overrides the default implementation"""
@@ -75,3 +48,29 @@ class MeterId(object):
     def __hash__(self):
         """Overrides the default implementation"""
         return hash(tuple(sorted(self.__dict__.items())))
+
+    @functools.total_ordering
+    class Tag(object):
+        def __init__(self, name: str = '', value: str = ''):
+            self.__name = name
+            self.__value = value  # type: str
+
+        @property
+        def name(self):
+            return self.__name
+
+        @property
+        def value(self):
+            return self.__value
+
+        def __hash__(self):
+            """Overrides the default implementation"""
+            return hash(tuple(sorted(self.__dict__.items())))
+
+        def __lt__(self, other):
+            if self.name == other.name:
+                return self.value < other.value
+            return self.name < other.value
+
+        def __eq__(self, other):
+            return self.name == other.name and self.value == other.value

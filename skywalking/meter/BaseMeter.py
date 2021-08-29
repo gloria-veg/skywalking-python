@@ -1,8 +1,5 @@
 from abc import ABC, abstractmethod
-from skywalking import config
 
-
-# name和tag在这里要不要定义？
 
 class BaseMeter(ABC):
     @abstractmethod
