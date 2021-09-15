@@ -21,6 +21,8 @@ from queue import Queue, Empty, Full
 from time import time
 
 import grpc
+
+from skywalking.meter import BaseMeter
 from skywalking.protocol.common.Common_pb2 import KeyStringValuePair
 from skywalking.protocol.language_agent.Tracing_pb2 import SegmentObject, SpanObject, Log, SegmentReference
 from skywalking.protocol.language_agent.Meter_pb2 import MeterData, MeterHistogram, Label, MeterSingleValue
@@ -31,6 +33,9 @@ from skywalking.client.grpc import GrpcServiceManagementClient, GrpcTraceSegment
     GrpcProfileTaskChannelService, GrpcMeterReportService
 from skywalking.loggings import logger
 from skywalking.trace.segment import Segment
+from skywalking.meter.Counter import Counter
+from skywalking.meter.Gauge import Gauge
+from skywalking.meter.Histogram import Histogram
 
 
 class GrpcProtocol(Protocol):
@@ -86,7 +91,6 @@ class GrpcProtocol(Protocol):
     def report(self, queue: Queue, block: bool = True):
         start = time()
         segment = None
-        meter = None
 
         def generator_segment():
             nonlocal segment
@@ -141,7 +145,88 @@ class GrpcProtocol(Protocol):
 
                 queue.task_done()
 
-        def generator_meter():
+        try:
+            self.traces_reporter.report(generator_segment())
+        except grpc.RpcError:
+            self.on_error()
+            if segment:
+                try:
+                    queue.put(segment, block=False)
+                except Full:
+                    pass
+
+    def report_meter(self, queue: Queue, block: bool = True):
+        start = time()
+        meter = None
+
+        def generator():
+            nonlocal meter
+            while True:
+                try:
+                    timeout = max(0, config.QUEUE_TIMEOUT - int(time() - start))  # type: int
+                    meter = queue.get(block=block, timeout=timeout)  # type: Meter
+                except Empty:
+                    return
+
+                logger.debug('reporting meter %s', meter)
+
+                if BaseMeter.get_meter_type() == 1 and Counter.mode == 1:
+                    Counter.increment()
+                    m = MeterData(singleValue=MeterSingleValue(
+                        name=str(BaseMeter.get_meter_type()),
+                        labels=[Label(
+                            name=Counter.name, value=Counter.get_counter())],
+                        value=Counter.increment.count
+                    ),
+                        histogram=MeterHistogram(
+                            name=str(3),
+                            labels=[Label(
+                                name=Histogram.name, value=Histogram.steps[0])],
+                            values=Histogram.buckets
+
+                        ),
+                        service='provider',
+                        serviceInstance='668d4b1ef83111ebbc3b8c85909c8b08',
+                        timestamp=0)
+
+                elif BaseMeter.get_meter_type() == 1 and Counter.mode == 2:
+                    m = MeterData(singleValue=MeterSingleValue(
+                        name=str(BaseMeter.get_meter_type()),
+                        labels=[Label(
+                            name=Counter.name, value=Counter.get_counter())],
+                        value=Counter.increment.count
+                    ),
+                        histogram=MeterHistogram(
+                            name=str(3),
+                            labels=[Label(
+                                name=Histogram.name, value=Histogram.steps[0])],
+                            values=Histogram.buckets
+                        ),
+                        service='provider',
+                        serviceInstance='668d4b1ef83111ebbc3b8c85909c8b08',
+                        timestamp=0)
+                else:
+                    m = MeterData(singleValue=MeterSingleValue(
+                        name=str(BaseMeter.get_meter_type()),
+                        labels=[Label(
+                            name=Gauge.name, value=Gauge.getter)],
+                        value=Gauge.get_gauge()
+                    ),
+                        histogram=MeterHistogram(
+                            name=str(3),
+                            labels=[Label(
+                                name=Histogram.name, value=Histogram.steps[0])],
+                            values=Histogram.buckets
+                        ),
+                        service='provider',
+                        serviceInstance='668d4b1ef83111ebbc3b8c85909c8b08',
+                        timestamp=0)
+
+                yield m
+
+                queue.task_done()
+
+        def generator_with_instance():
             nonlocal meter
             while True:
                 try:
@@ -177,17 +262,10 @@ class GrpcProtocol(Protocol):
                 queue.task_done()
 
         try:
-            self.traces_reporter.report(generator_segment())
-            self.meter_reporter.report(generator_meter())
+            self.meter_reporter.report(generator())
 
         except grpc.RpcError:
             self.on_error()
-
-            if segment:
-                try:
-                    queue.put(segment, block=False)
-                except Full:
-                    pass
 
             if meter:
                 try:

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 
 
 class BaseMeter(ABC):
@@ -19,3 +20,13 @@ class BaseMeter(ABC):
     @property
     def tag(self):
         return ""
+
+    class MeterType(Enum):
+        COUNTER = 1
+        GAUGE = 2
+        HISTOGRAM = 3
+
+    def get_meter_type(self):
+        return None
+
+
